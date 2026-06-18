@@ -38,8 +38,7 @@ npm install
 Crear archivo `.env`:
 
 ```env
-VITE_SUPABASE_URL=https://tfethynmceqbbaitrxfy.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
+
 ```
 
 ```bash
