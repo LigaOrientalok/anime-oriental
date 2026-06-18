@@ -63,6 +63,38 @@ export const useAuthStore = defineStore('auth', () => {
     return true
   }
 
+  async function signInWithGoogle() {
+    loading.value = true
+    error.value = null
+    const { error: err } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/auth/callback`,
+      }
+    })
+    if (err) {
+      error.value = err.message
+      loading.value = false
+      return false
+    }
+    return true
+  }
+
+  async function handleAuthCallback() {
+    const { data: { session }, error: err } = await supabase.auth.getSession()
+    if (err) {
+      error.value = err.message
+      return false
+    }
+    if (session) {
+      user.value = session.user
+      await fetchProfile()
+      localStorage.setItem('anime-oriental-user', JSON.stringify(profile.value))
+      return true
+    }
+    return false
+  }
+
   async function signOut() {
     await supabase.auth.signOut()
     user.value = null
@@ -122,7 +154,7 @@ export const useAuthStore = defineStore('auth', () => {
     user, profile, loading, error,
     isAuthenticated, isAdmin,
     fetchSession, fetchProfile,
-    signUp, signIn, signOut,
+    signUp, signIn, signInWithGoogle, handleAuthCallback, signOut,
     resetPassword, updateProfile, uploadAvatar
   }
 })

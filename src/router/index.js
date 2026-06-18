@@ -12,6 +12,7 @@ const routes = [
       { path: 'perfil', name: 'Profile', component: () => import('@/views/Profile.vue'), meta: { title: 'Mi Perfil', requiresAuth: true } },
       { path: 'login', name: 'Login', component: () => import('@/views/Login.vue'), meta: { title: 'Iniciar Sesión', guest: true } },
       { path: 'registro', name: 'Register', component: () => import('@/views/Register.vue'), meta: { title: 'Registro', guest: true } },
+      { path: 'auth/callback', name: 'AuthCallback', component: () => import('@/views/AuthCallback.vue'), meta: { title: 'Autenticando...' } },
       { path: 'recuperar-password', name: 'ForgotPassword', component: () => import('@/views/ForgotPassword.vue'), meta: { title: 'Recuperar Contraseña', guest: true } },
       {
         path: 'admin',
