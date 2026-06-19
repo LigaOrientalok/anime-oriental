@@ -7,7 +7,7 @@
       @favorite="toggleFav"
     />
 
-    <SearchBar v-if="!featuredAnime" class="max-w-2xl mx-auto px-4 mt-8" />
+    <SearchBar v-if="!featuredAnime" class="max-w-2xl mx-auto px-4 mt-12" />
 
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12 pb-16">
       <div v-if="latestEpisodes.length" class="mt-8">

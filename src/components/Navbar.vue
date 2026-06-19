@@ -1,7 +1,10 @@
 <template>
-  <nav class="glass fixed top-0 left-0 right-0 z-50">
+  <nav class="glass fixed top-0 left-0 right-0 z-50" @mouseleave="navHover = false">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="flex items-center justify-between h-16">
+      <div
+        class="flex items-center justify-between h-16"
+        @mouseenter="navHover = true"
+      >
         <router-link to="/" class="flex items-center space-x-2">
           <span class="text-2xl font-bold">
             <span class="text-primary-500">Anime</span>
@@ -44,7 +47,21 @@
       </div>
     </div>
 
-    <div v-if="mobileMenuOpen" class="md:hidden glass border-t border-dark-700 animate-slide-down">
+    <!-- Nav links dropdown on hover -->
+    <div
+      v-if="navHover"
+      class="hidden md:block border-t border-dark-700 animate-slide-down"
+      @mouseenter="navHover = true"
+      @mouseleave="navHover = false"
+    >
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3 flex items-center gap-6">
+        <router-link @click="navHover = false" to="/" class="text-gray-300 hover:text-white transition-colors text-sm font-medium">Inicio</router-link>
+        <router-link @click="navHover = false" to="/catalogo" class="text-gray-300 hover:text-white transition-colors text-sm font-medium">Catálogo</router-link>
+        <router-link v-if="auth.isAdmin" @click="navHover = false" to="/admin" class="text-gray-300 hover:text-white transition-colors text-sm font-medium">Admin</router-link>
+      </div>
+    </div>
+
+    <div v-if="mobileMenuOpen" class="md:hidden border-t border-dark-700 animate-slide-down">
       <div class="px-4 py-3 space-y-3">
         <router-link @click="mobileMenuOpen = false" to="/" class="block text-gray-300 hover:text-white py-2">Inicio</router-link>
         <router-link @click="mobileMenuOpen = false" to="/catalogo" class="block text-gray-300 hover:text-white py-2">Catálogo</router-link>
@@ -64,4 +81,5 @@ import { useAuthStore } from '@/stores/auth'
 
 const auth = useAuthStore()
 const mobileMenuOpen = ref(false)
+const navHover = ref(false)
 </script>
