@@ -12,6 +12,26 @@ ALTER TABLE watch_later ENABLE ROW LEVEL SECURITY;
 ALTER TABLE comments ENABLE ROW LEVEL SECURITY;
 
 -- ============================================================
+-- FUNCIÓN HELPER: is_admin (bypasses RLS con SECURITY DEFINER)
+-- ============================================================
+-- Las políticas NO deben hacer subconsultas a profiles
+-- porque eso causa infinite recursion (RLS se dispara de nuevo).
+-- Esta función corre con permisos del creador (SECURITY DEFINER)
+-- y bypassea RLS para verificar el rol.
+CREATE OR REPLACE FUNCTION public.is_admin()
+RETURNS BOOLEAN
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+BEGIN
+  RETURN EXISTS (
+    SELECT 1 FROM public.profiles
+    WHERE id = auth.uid() AND role = 'admin'
+  );
+END;
+$$;
+
+-- ============================================================
 -- PROFILES
 -- ============================================================
 -- Usuarios: leer su propio perfil
@@ -19,12 +39,10 @@ CREATE POLICY "Usuarios pueden leer su propio perfil"
   ON profiles FOR SELECT
   USING (auth.uid() = id);
 
--- Administradores: leer todos los perfiles
+-- Administradores: leer todos los perfiles (usa is_admin())
 CREATE POLICY "Admins pueden leer todos los perfiles"
   ON profiles FOR SELECT
-  USING (
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
-  );
+  USING (public.is_admin());
 
 -- Usuarios: actualizar su propio perfil
 CREATE POLICY "Usuarios pueden actualizar su propio perfil"
@@ -32,12 +50,10 @@ CREATE POLICY "Usuarios pueden actualizar su propio perfil"
   USING (auth.uid() = id)
   WITH CHECK (auth.uid() = id);
 
--- Solo admins pueden cambiar roles
+-- Solo admins pueden cambiar roles (usa is_admin())
 CREATE POLICY "Solo admins pueden cambiar roles"
   ON profiles FOR UPDATE
-  USING (
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
-  );
+  USING (public.is_admin());
 
 -- ============================================================
 -- ANIMES
@@ -50,21 +66,15 @@ CREATE POLICY "Todos pueden leer animes"
 -- Solo administradores pueden insertar/modificar/eliminar animes
 CREATE POLICY "Admins pueden insertar animes"
   ON animes FOR INSERT
-  WITH CHECK (
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
-  );
+  WITH CHECK (public.is_admin());
 
 CREATE POLICY "Admins pueden actualizar animes"
   ON animes FOR UPDATE
-  USING (
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
-  );
+  USING (public.is_admin());
 
 CREATE POLICY "Admins pueden eliminar animes"
   ON animes FOR DELETE
-  USING (
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
-  );
+  USING (public.is_admin());
 
 -- ============================================================
 -- EPISODES
@@ -77,21 +87,15 @@ CREATE POLICY "Todos pueden leer episodios"
 -- Solo admins pueden insertar/modificar/eliminar episodios
 CREATE POLICY "Admins pueden insertar episodios"
   ON episodes FOR INSERT
-  WITH CHECK (
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
-  );
+  WITH CHECK (public.is_admin());
 
 CREATE POLICY "Admins pueden actualizar episodios"
   ON episodes FOR UPDATE
-  USING (
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
-  );
+  USING (public.is_admin());
 
 CREATE POLICY "Admins pueden eliminar episodios"
   ON episodes FOR DELETE
-  USING (
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
-  );
+  USING (public.is_admin());
 
 -- ============================================================
 -- FAVORITES
@@ -167,9 +171,7 @@ CREATE POLICY "Usuarios pueden eliminar sus comentarios"
   ON comments FOR DELETE
   USING (auth.uid() = user_id);
 
--- Admins: pueden eliminar cualquier comentario
+-- Admins: pueden eliminar cualquier comentario (usa is_admin())
 CREATE POLICY "Admins pueden eliminar comentarios"
   ON comments FOR DELETE
-  USING (
-    EXISTS (SELECT 1 FROM profiles WHERE id = auth.uid() AND role = 'admin')
-  );
+  USING (public.is_admin());
