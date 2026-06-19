@@ -19,7 +19,7 @@ const routes = [
         component: () => import('@/views/admin/Dashboard.vue'),
         meta: { title: 'Admin', requiresAuth: true, requiresAdmin: true },
         children: [
-          { path: '', name: 'AdminDashboard', component: () => import('@/views/admin/Dashboard.vue') },
+          { path: '', name: 'AdminDashboard', component: () => import('@/views/admin/AdminHome.vue') },
           { path: 'animes', name: 'AdminAnimes', component: () => import('@/views/admin/AnimeManagement.vue') },
           { path: 'animes/nuevo', name: 'AdminAnimeNew', component: () => import('@/views/admin/AnimeManagement.vue') },
           { path: 'animes/:id', name: 'AdminAnimeEdit', component: () => import('@/views/admin/AnimeManagement.vue') },
@@ -40,16 +40,21 @@ const router = createRouter({
   }
 })
 
-router.beforeEach((to, from, next) => {
+router.beforeEach(async (to, from, next) => {
   document.title = `${to.meta.title || 'Anime Oriental'} | Anime Oriental`
 
-  const user = JSON.parse(localStorage.getItem('anime-oriental-user') || 'null')
+  const { useAuthStore } = await import('@/stores/auth')
+  const auth = useAuthStore()
 
-  if (to.meta.requiresAuth && !user) {
+  if (!auth.user) {
+    await auth.fetchSession()
+  }
+
+  if (to.meta.requiresAuth && !auth.isAuthenticated) {
     next({ name: 'Login', query: { redirect: to.fullPath } })
-  } else if (to.meta.guest && user) {
+  } else if (to.meta.guest && auth.isAuthenticated) {
     next({ name: 'Home' })
-  } else if (to.meta.requiresAdmin && (!user || user.role !== 'admin')) {
+  } else if (to.meta.requiresAdmin && !auth.isAdmin) {
     next({ name: 'Home' })
   } else {
     next()

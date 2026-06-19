@@ -36,7 +36,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onUnmounted } from 'vue'
 import { supabase } from '@/lib/supabase'
 
 defineProps({
@@ -47,6 +47,8 @@ const query = ref('')
 const results = ref([])
 const isOpen = ref(false)
 let debounceTimer = null
+
+onUnmounted(() => clearTimeout(debounceTimer))
 
 function onInput() {
   clearTimeout(debounceTimer)
