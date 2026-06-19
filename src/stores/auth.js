@@ -38,11 +38,30 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function fetchProfile() {
     if (!user.value) return
-    const { data, error: err } = await supabase
+    let { data, error: err } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', user.value.id)
       .single()
+
+    if (err && err.code === 'PGRST116') {
+      const { data: newProfile, error: insertErr } = await supabase
+        .from('profiles')
+        .insert({
+          id: user.value.id,
+          email: user.value.email,
+          role: 'user',
+        })
+        .select()
+        .single()
+      if (insertErr) {
+        console.error('Error creating profile:', insertErr)
+        return
+      }
+      data = newProfile
+      err = null
+    }
+
     if (err) {
       console.error('Error fetching profile:', err)
       return
@@ -53,11 +72,28 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function fetchProfileSilent() {
     if (!user.value) return
-    const { data, error: err } = await supabase
+    let { data, error: err } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', user.value.id)
       .single()
+
+    if (err && err.code === 'PGRST116') {
+      const { data: newProfile } = await supabase
+        .from('profiles')
+        .insert({
+          id: user.value.id,
+          email: user.value.email,
+          role: 'user',
+        })
+        .select()
+        .single()
+      if (newProfile) {
+        data = newProfile
+        err = null
+      }
+    }
+
     if (!err && data) {
       profile.value = data
       localStorage.setItem('anime-oriental-user', JSON.stringify(profile.value))
