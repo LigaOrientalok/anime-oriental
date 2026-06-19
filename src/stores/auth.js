@@ -16,11 +16,9 @@ export const useAuthStore = defineStore('auth', () => {
   function initAuthListener() {
     if (authListener) return
     const { data } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        if (session) {
-          user.value = session.user
-          fetchProfileSilent()
-        }
+      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') && session) {
+        user.value = session.user
+        fetchProfileSilent()
       } else if (event === 'SIGNED_OUT') {
         user.value = null
         profile.value = null
@@ -119,6 +117,22 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function handleAuthCallback() {
     initAuthListener()
+
+    const urlParams = new URLSearchParams(window.location.search)
+    const code = urlParams.get('code')
+
+    if (code) {
+      try {
+        const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+        if (data?.session) {
+          user.value = data.session.user
+          await fetchProfile()
+          return true
+        }
+      } catch (e) {
+        console.error('exchangeCodeForSession failed:', e)
+      }
+    }
 
     for (let i = 0; i < 20; i++) {
       const { data: { session } } = await supabase.auth.getSession()
