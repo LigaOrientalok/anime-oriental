@@ -11,6 +11,25 @@ export const useAuthStore = defineStore('auth', () => {
   const isAuthenticated = computed(() => !!user.value)
   const isAdmin = computed(() => profile.value?.role === 'admin')
 
+  let authListener = null
+
+  function initAuthListener() {
+    if (authListener) return
+    const { data } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        if (session) {
+          user.value = session.user
+          fetchProfileSilent()
+        }
+      } else if (event === 'SIGNED_OUT') {
+        user.value = null
+        profile.value = null
+        localStorage.removeItem('anime-oriental-user')
+      }
+    })
+    authListener = data
+  }
+
   async function fetchSession() {
     const { data: { session } } = await supabase.auth.getSession()
     if (session) {
@@ -31,6 +50,20 @@ export const useAuthStore = defineStore('auth', () => {
       return
     }
     profile.value = data
+    localStorage.setItem('anime-oriental-user', JSON.stringify(profile.value))
+  }
+
+  async function fetchProfileSilent() {
+    if (!user.value) return
+    const { data, error: err } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', user.value.id)
+      .single()
+    if (!err && data) {
+      profile.value = data
+      localStorage.setItem('anime-oriental-user', JSON.stringify(profile.value))
+    }
   }
 
   async function signUp(email, password) {
@@ -58,7 +91,6 @@ export const useAuthStore = defineStore('auth', () => {
     }
     user.value = data.user
     await fetchProfile()
-    localStorage.setItem('anime-oriental-user', JSON.stringify(profile.value))
     loading.value = false
     return true
   }
@@ -66,10 +98,14 @@ export const useAuthStore = defineStore('auth', () => {
   async function signInWithGoogle() {
     loading.value = true
     error.value = null
-    const { error: err } = await supabase.auth.signInWithOAuth({
+    const { data, error: err } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
+        queryParams: {
+          access_type: 'online',
+          prompt: 'select_account',
+        },
       }
     })
     if (err) {
@@ -77,46 +113,24 @@ export const useAuthStore = defineStore('auth', () => {
       loading.value = false
       return false
     }
+    loading.value = false
     return true
   }
 
   async function handleAuthCallback() {
-    const query = new URLSearchParams(window.location.search)
-    const code = query.get('code')
-    const hashParams = new URLSearchParams(window.location.hash.substring(1))
-    const accessToken = hashParams.get('access_token')
+    initAuthListener()
 
-    let session = null
-
-    if (code) {
-      const { data, error: err } = await supabase.auth.exchangeCodeForSession(code)
-      if (err) {
-        error.value = err.message
-        return false
+    for (let i = 0; i < 20; i++) {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (session) {
+        user.value = session.user
+        await fetchProfile()
+        return true
       }
-      session = data.session
-    } else if (accessToken) {
-      const { data, error: err } = await supabase.auth.getSession()
-      if (err) {
-        error.value = err.message
-        return false
-      }
-      session = data.session
-    } else {
-      const { data, error: err } = await supabase.auth.getSession()
-      if (err) {
-        error.value = err.message
-        return false
-      }
-      session = data.session
+      await new Promise(r => setTimeout(r, 500))
     }
 
-    if (session) {
-      user.value = session.user
-      await fetchProfile()
-      localStorage.setItem('anime-oriental-user', JSON.stringify(profile.value))
-      return true
-    }
+    console.error('Auth callback timed out - no session found')
     return false
   }
 
@@ -175,11 +189,14 @@ export const useAuthStore = defineStore('auth', () => {
     return publicUrl
   }
 
+  initAuthListener()
+
   return {
     user, profile, loading, error,
     isAuthenticated, isAdmin,
     fetchSession, fetchProfile,
     signUp, signIn, signInWithGoogle, handleAuthCallback, signOut,
-    resetPassword, updateProfile, uploadAvatar
+    resetPassword, updateProfile, uploadAvatar,
+    initAuthListener
   }
 })
