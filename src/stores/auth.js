@@ -81,11 +81,36 @@ export const useAuthStore = defineStore('auth', () => {
   }
 
   async function handleAuthCallback() {
-    const { data: { session }, error: err } = await supabase.auth.getSession()
-    if (err) {
-      error.value = err.message
-      return false
+    const query = new URLSearchParams(window.location.search)
+    const code = query.get('code')
+    const hashParams = new URLSearchParams(window.location.hash.substring(1))
+    const accessToken = hashParams.get('access_token')
+
+    let session = null
+
+    if (code) {
+      const { data, error: err } = await supabase.auth.exchangeCodeForSession(code)
+      if (err) {
+        error.value = err.message
+        return false
+      }
+      session = data.session
+    } else if (accessToken) {
+      const { data, error: err } = await supabase.auth.getSession()
+      if (err) {
+        error.value = err.message
+        return false
+      }
+      session = data.session
+    } else {
+      const { data, error: err } = await supabase.auth.getSession()
+      if (err) {
+        error.value = err.message
+        return false
+      }
+      session = data.session
     }
+
     if (session) {
       user.value = session.user
       await fetchProfile()

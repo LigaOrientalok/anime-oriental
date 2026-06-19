@@ -46,7 +46,7 @@ router.beforeEach(async (to, from, next) => {
   const { useAuthStore } = await import('@/stores/auth')
   const auth = useAuthStore()
 
-  if (!auth.user) {
+  if (to.name !== 'AuthCallback' && !auth.user) {
     await auth.fetchSession()
   }
 

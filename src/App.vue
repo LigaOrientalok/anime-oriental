@@ -9,6 +9,8 @@ import { useAuthStore } from '@/stores/auth'
 const auth = useAuthStore()
 
 onMounted(async () => {
-  await auth.fetchSession()
+  if (!window.location.pathname.includes('/auth/callback')) {
+    await auth.fetchSession()
+  }
 })
 </script>
