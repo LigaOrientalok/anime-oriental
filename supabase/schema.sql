@@ -111,17 +111,18 @@ CREATE INDEX idx_profiles_role ON profiles(role);
 -- TRIGGER: auto-crear perfil al registrar usuario
 -- ============================================================
 CREATE OR REPLACE FUNCTION handle_new_user()
-RETURNS TRIGGER AS $$
+RETURNS TRIGGER SECURITY DEFINER SET search_path = '' AS $$
 BEGIN
   INSERT INTO profiles (id, email, role)
   VALUES (
     NEW.id,
-    NEW.email,
-    COALESCE(NEW.raw_user_meta_data->>'role', 'user')
-  );
+    COALESCE(NEW.email, NEW.raw_user_meta_data->>'email', 'unknown@email.com'),
+    'user'
+  )
+  ON CONFLICT (id) DO NOTHING;
   RETURN NEW;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+$$ LANGUAGE plpgsql;
 
 CREATE TRIGGER on_auth_user_created
   AFTER INSERT ON auth.users

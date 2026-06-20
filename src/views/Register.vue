@@ -13,7 +13,7 @@
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-300 mb-2">Contraseña</label>
-            <input v-model="password" type="password" required minlength="6" class="input-field" placeholder="Mínimo 6 caracteres" />
+            <input v-model="password" type="password" required minlength="8" class="input-field" placeholder="Mínimo 8 caracteres" />
           </div>
           <div>
             <label class="block text-sm font-medium text-gray-300 mb-2">Confirmar Contraseña</label>

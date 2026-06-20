@@ -134,18 +134,22 @@ const statusClass = computed(() => {
 })
 
 onMounted(async () => {
-  const id = route.params.id
-  anime.value = await animeStore.fetchAnimeById(id)
-  if (anime.value) {
-    episodes.value = await animeStore.fetchEpisodes(id)
+  try {
+    const id = route.params.id
+    anime.value = await animeStore.fetchAnimeById(id)
+    if (anime.value) {
+      episodes.value = await animeStore.fetchEpisodes(id)
 
-    const popular = await animeStore.getPopularAnimes(12)
-    recommendations.value = popular.filter(a => a.id !== id).slice(0, 6)
+      const popular = await animeStore.getPopularAnimes(12)
+      recommendations.value = popular.filter(a => a.id !== id).slice(0, 6)
 
-    if (auth.isAuthenticated) {
-      isFavorite.value = await userStore.isFavorite(auth.user.id, id)
-      isInWatchLater.value = await userStore.isInWatchLater(auth.user.id, id)
+      if (auth.isAuthenticated) {
+        isFavorite.value = await userStore.isFavorite(auth.user.id, id)
+        isInWatchLater.value = await userStore.isInWatchLater(auth.user.id, id)
+      }
     }
+  } catch (e) {
+    anime.value = null
   }
   loading.value = false
 })
@@ -158,23 +162,21 @@ function playFirstEpisode() {
 
 async function toggleFavorite() {
   if (!auth.isAuthenticated) { router.push('/login'); return }
-  if (isFavorite.value) {
-    await userStore.removeFavorite(auth.user.id, anime.value.id)
-    isFavorite.value = false
-  } else {
-    await userStore.addFavorite(auth.user.id, anime.value.id)
-    isFavorite.value = true
-  }
+  const wasFav = isFavorite.value
+  isFavorite.value = !wasFav
+  const ok = wasFav
+    ? await userStore.removeFavorite(auth.user.id, anime.value.id)
+    : await userStore.addFavorite(auth.user.id, anime.value.id)
+  if (!ok) isFavorite.value = wasFav
 }
 
 async function toggleWatchLater() {
   if (!auth.isAuthenticated) { router.push('/login'); return }
-  if (isInWatchLater.value) {
-    await userStore.removeWatchLater(auth.user.id, anime.value.id)
-    isInWatchLater.value = false
-  } else {
-    await userStore.addWatchLater(auth.user.id, anime.value.id)
-    isInWatchLater.value = true
-  }
+  const was = isInWatchLater.value
+  isInWatchLater.value = !was
+  const ok = was
+    ? await userStore.removeWatchLater(auth.user.id, anime.value.id)
+    : await userStore.addWatchLater(auth.user.id, anime.value.id)
+  if (!ok) isInWatchLater.value = was
 }
 </script>

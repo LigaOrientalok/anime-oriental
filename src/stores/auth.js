@@ -18,14 +18,21 @@ export const useAuthStore = defineStore('auth', () => {
     const { data } = supabase.auth.onAuthStateChange((event, session) => {
       if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION' || event === 'TOKEN_REFRESHED') && session) {
         user.value = session.user
-        fetchProfileSilent()
+        fetchProfileSilent().catch(() => {})
       } else if (event === 'SIGNED_OUT') {
         user.value = null
         profile.value = null
         localStorage.removeItem('anime-oriental-user')
       }
     })
-    authListener = data
+    authListener = data.subscription
+  }
+
+  function destroyAuthListener() {
+    if (authListener) {
+      authListener.unsubscribe()
+      authListener = null
+    }
   }
 
   async function fetchSession() {
@@ -45,7 +52,7 @@ export const useAuthStore = defineStore('auth', () => {
       .single()
 
     if (err && err.code === 'PGRST116') {
-      const { data: newProfile, error: insertErr } = await supabase
+      const { data: newProfile } = await supabase
         .from('profiles')
         .insert({
           id: user.value.id,
@@ -54,18 +61,14 @@ export const useAuthStore = defineStore('auth', () => {
         })
         .select()
         .single()
-      if (insertErr) {
-        console.error('Error creating profile:', insertErr)
-        return
+        .catch(() => {})
+      if (newProfile) {
+        data = newProfile
+        err = null
       }
-      data = newProfile
-      err = null
     }
 
-    if (err) {
-      console.error('Error fetching profile:', err)
-      return
-    }
+    if (err) return
     profile.value = data
     localStorage.setItem('anime-oriental-user', JSON.stringify(profile.value))
   }
@@ -166,7 +169,7 @@ export const useAuthStore = defineStore('auth', () => {
           return true
         }
       } catch (e) {
-        console.error('exchangeCodeForSession failed:', e)
+        // fallback to polling
       }
     }
 
@@ -180,7 +183,6 @@ export const useAuthStore = defineStore('auth', () => {
       await new Promise(r => setTimeout(r, 500))
     }
 
-    console.error('Auth callback timed out - no session found')
     return false
   }
 
@@ -208,6 +210,9 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function updateProfile(updates) {
     if (!user.value) return false
+    if (updates.role && updates.role !== 'user') {
+      return false
+    }
     const { error: err } = await supabase
       .from('profiles')
       .update(updates)
@@ -223,7 +228,16 @@ export const useAuthStore = defineStore('auth', () => {
 
   async function uploadAvatar(file) {
     if (!user.value) return null
-    const fileExt = file.name.split('.').pop()
+    if (file.size > 2 * 1024 * 1024) {
+      error.value = 'La imagen no puede superar los 2MB'
+      return null
+    }
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+    if (!allowedTypes.includes(file.type)) {
+      error.value = 'Tipo de archivo no permitido. Usá JPG, PNG, WebP o GIF.'
+      return null
+    }
+    const fileExt = file.type.split('/')[1] || 'png'
     const filePath = `avatars/${user.value.id}.${fileExt}`
     const { error: err } = await supabase.storage
       .from('avatars')
@@ -247,6 +261,6 @@ export const useAuthStore = defineStore('auth', () => {
     fetchSession, fetchProfile,
     signUp, signIn, signInWithGoogle, handleAuthCallback, signOut,
     resetPassword, updateProfile, uploadAvatar,
-    initAuthListener
+    initAuthListener, destroyAuthListener
   }
 })

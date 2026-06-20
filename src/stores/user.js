@@ -73,23 +73,12 @@ export const useUserStore = defineStore('user', () => {
   }
 
   async function updateHistory(userId, episodeId, progress, completed = false) {
-    const { data: existing } = await supabase
+    await supabase
       .from('history')
-      .select('id')
-      .eq('user_id', userId)
-      .eq('episode_id', episodeId)
-      .maybeSingle()
-
-    if (existing) {
-      await supabase
-        .from('history')
-        .update({ progress_seconds: progress, completed, updated_at: new Date() })
-        .eq('id', existing.id)
-    } else {
-      await supabase
-        .from('history')
-        .insert([{ user_id: userId, episode_id: episodeId, progress_seconds: progress, completed }])
-    }
+      .upsert(
+        { user_id: userId, episode_id: episodeId, progress_seconds: progress, completed, updated_at: new Date().toISOString() },
+        { onConflict: 'user_id,episode_id' }
+      )
   }
 
   async function getProgress(userId, episodeId) {

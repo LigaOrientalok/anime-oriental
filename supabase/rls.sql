@@ -44,16 +44,17 @@ CREATE POLICY "Admins pueden leer todos los perfiles"
   ON profiles FOR SELECT
   USING (public.is_admin());
 
--- Usuarios: actualizar su propio perfil
+-- Usuarios: actualizar su propio perfil (sin cambiar el role)
 CREATE POLICY "Usuarios pueden actualizar su propio perfil"
   ON profiles FOR UPDATE
   USING (auth.uid() = id)
-  WITH CHECK (auth.uid() = id);
+  WITH CHECK (auth.uid() = id AND (role IS NOT DISTINCT FROM 'user' OR public.is_admin()));
 
 -- Solo admins pueden cambiar roles (usa is_admin())
 CREATE POLICY "Solo admins pueden cambiar roles"
   ON profiles FOR UPDATE
-  USING (public.is_admin());
+  USING (public.is_admin())
+  WITH CHECK (public.is_admin());
 
 -- ============================================================
 -- ANIMES

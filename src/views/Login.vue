@@ -16,7 +16,7 @@
             <input v-model="password" type="password" required class="input-field" placeholder="••••••••" />
           </div>
           <div v-if="authStore.error" class="bg-red-500/10 border border-red-500/30 text-red-400 px-4 py-3 rounded-lg text-sm">
-            {{ authStore.error }}
+            Email o contraseña incorrectos
           </div>
           <button type="submit" :disabled="authStore.loading" class="btn-primary w-full flex items-center justify-center gap-2">
             <svg v-if="authStore.loading" class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>

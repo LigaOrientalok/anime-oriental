@@ -1,12 +1,21 @@
+function validateJKUrl(url) {
+  try {
+    const parsed = new URL(url)
+    return parsed.hostname === 'jkanime.net' && parsed.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
 export default async function handler(req, res) {
   const { url } = req.query
-  if (!url) {
-    return res.status(400).json({ error: 'Missing url parameter' })
+  if (!url || !validateJKUrl(url)) {
+    return res.status(400).json({ error: 'Invalid URL. Only https://jkanime.net/ is allowed.' })
   }
 
-  try {
-    const ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+  const ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
 
+  try {
     const animeRes = await fetch(url, { headers: { 'User-Agent': ua } })
     const html = await animeRes.text()
 
@@ -27,8 +36,7 @@ export default async function handler(req, res) {
     const totalEpisodes = epTotalMatch ? parseInt(epTotalMatch[1]) : null
 
     const cookies = []
-    const cookieHeaders = animeRes.headers.entries()
-    for (const [key, val] of cookieHeaders) {
+    for (const [key, val] of animeRes.headers.entries()) {
       if (key.toLowerCase() === 'set-cookie') {
         cookies.push(val.split(';')[0])
       }
@@ -76,6 +84,6 @@ export default async function handler(req, res) {
     res.setHeader('Cache-Control', 's-maxage=300, stale-while-revalidate')
     res.status(200).json({ episodes, total: totalEpisodes })
   } catch (err) {
-    res.status(500).json({ error: err.message })
+    res.status(502).json({ error: 'Error connecting to JKAnime' })
   }
 }

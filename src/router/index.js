@@ -27,7 +27,7 @@ const routes = [
           { path: 'estadisticas', name: 'AdminStats', component: () => import('@/views/admin/Stats.vue') },
         ]
       },
-      { path: '/:pathMatch(.*)*', name: 'NotFound', component: () => import('@/views/Home.vue') },
+      { path: '/:pathMatch(.*)*', name: 'NotFound', component: () => import('@/views/NotFound.vue') },
     ]
   }
 ]
@@ -40,18 +40,24 @@ const router = createRouter({
   }
 })
 
+let sessionChecked = false
+
 router.beforeEach(async (to, from, next) => {
   document.title = `${to.meta.title || 'Anime Oriental'} | Anime Oriental`
+
+  if (to.name === 'NotFound') { next(); return }
 
   const { useAuthStore } = await import('@/stores/auth')
   const auth = useAuthStore()
 
-  if (to.name !== 'AuthCallback' && !auth.user) {
+  if (!sessionChecked && to.name !== 'AuthCallback' && !auth.user) {
     await auth.fetchSession()
+    sessionChecked = true
   }
 
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
-    next({ name: 'Login', query: { redirect: to.fullPath } })
+    const redirect = to.fullPath.startsWith('/') ? to.fullPath : '/'
+    next({ name: 'Login', query: { redirect } })
   } else if (to.meta.guest && auth.isAuthenticated) {
     next({ name: 'Home' })
   } else if (to.meta.requiresAdmin && !auth.isAdmin) {

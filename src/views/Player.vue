@@ -165,6 +165,8 @@ const embedSrc = computed(() => {
   return getEmbedSrc(episode.value.video_url)
 })
 let controlsTimer = null
+let autoNextTimer = null
+let fullscreenChangeHandler = null
 
 const prevEpisode = computed(() => {
   if (!episode.value) return null
@@ -179,25 +181,38 @@ const nextEpisode = computed(() => {
 })
 
 onMounted(async () => {
-  const { animeId, episodeId } = route.params
-  episode.value = await animeStore.fetchEpisodeById(episodeId)
+  try {
+    const { animeId, episodeId } = route.params
+    episode.value = await animeStore.fetchEpisodeById(episodeId)
 
-  if (episode.value) {
-    allEpisodes.value = await animeStore.fetchEpisodes(animeId || episode.value.anime_id)
+    if (episode.value) {
+      allEpisodes.value = await animeStore.fetchEpisodes(animeId || episode.value.anime_id)
 
-    if (auth.isAuthenticated) {
-      const progress = await userStore.getProgress(auth.user.id, episodeId)
-      await nextTick()
-      if (video.value && progress > 0) {
-        video.value.currentTime = progress
+      if (auth.isAuthenticated) {
+        const progress = await userStore.getProgress(auth.user.id, episodeId)
+        await nextTick()
+        if (video.value && progress > 0) {
+          video.value.currentTime = progress
+        }
       }
     }
+  } catch (e) {
+    episode.value = null
   }
   loading.value = false
+
+  fullscreenChangeHandler = () => {
+    isFullscreen.value = !!document.fullscreenElement
+  }
+  document.addEventListener('fullscreenchange', fullscreenChangeHandler)
 })
 
 onUnmounted(() => {
   clearTimeout(controlsTimer)
+  clearTimeout(autoNextTimer)
+  if (fullscreenChangeHandler) {
+    document.removeEventListener('fullscreenchange', fullscreenChangeHandler)
+  }
 })
 
 function onVideoError() {
@@ -222,7 +237,7 @@ function togglePlay() {
   if (!video.value) return
   showOverlayPlay.value = false
   if (video.value.paused) {
-    video.value.play()
+    video.value.play().catch(() => {})
     isPlaying.value = true
   } else {
     video.value.pause()
@@ -249,11 +264,9 @@ function setSpeed(rate) {
 function toggleFullscreen() {
   if (!playerContainer.value) return
   if (!document.fullscreenElement) {
-    playerContainer.value.requestFullscreen()
-    isFullscreen.value = true
+    playerContainer.value.requestFullscreen().catch(() => {})
   } else {
-    document.exitFullscreen()
-    isFullscreen.value = false
+    document.exitFullscreen().catch(() => {})
   }
 }
 
@@ -295,7 +308,7 @@ async function onEnded() {
     await userStore.updateHistory(auth.user.id, episode.value.id, duration.value, true)
   }
   if (nextEpisode.value) {
-    setTimeout(() => goToEpisode(nextEpisode.value.id), 3000)
+    autoNextTimer = setTimeout(() => goToEpisode(nextEpisode.value.id), 3000)
   }
 }
 
