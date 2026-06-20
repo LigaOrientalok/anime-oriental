@@ -5,7 +5,13 @@
         <h1 class="text-3xl font-bold">Gestión de Episodios</h1>
         <p v-if="animeTitle" class="text-dark-400 mt-1">{{ animeTitle }}</p>
       </div>
-      <button @click="showForm = true; editingEpisode = null" class="btn-primary">+ Nuevo Episodio</button>
+      <div class="flex gap-2">
+        <button @click="showJKImport = true" class="btn-secondary flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+          Importar de JKAnime
+        </button>
+        <button @click="showForm = true; editingEpisode = null" class="btn-primary">+ Nuevo Episodio</button>
+      </div>
     </div>
 
     <div v-if="loading" class="flex justify-center py-12">
@@ -47,6 +53,54 @@
               </tr>
             </tbody>
           </table>
+        </div>
+      </div>
+
+      <div v-if="showJKImport" class="fixed inset-0 bg-black/70 z-50 flex items-start justify-center pt-20 px-4 overflow-y-auto" @click.self="showJKImport = false">
+        <div class="card p-6 w-full max-w-lg animate-scale-in mb-20">
+          <div class="flex items-center justify-between mb-6">
+            <h2 class="text-2xl font-bold">Importar desde JKAnime</h2>
+            <button @click="showJKImport = false" class="text-dark-400 hover:text-white transition-colors">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+
+          <div class="flex gap-3 mb-4">
+            <input
+              v-model="jkUrl"
+              @keydown.enter="fetchJKAnime"
+              placeholder="URL del episodio en JKAnime..."
+              class="input-field flex-1"
+            />
+            <button @click="fetchJKAnime" :disabled="jkLoading || !jkUrl.trim()" class="btn-primary">
+              <svg v-if="jkLoading" class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+              <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            </button>
+          </div>
+
+          <div v-if="jkError" class="bg-red-500/10 text-red-400 px-4 py-3 rounded-lg text-sm mb-4">{{ jkError }}</div>
+
+          <div v-if="jkServers.length" class="space-y-2">
+            <p class="text-sm text-dark-400 mb-2">Servidores disponibles para este episodio:</p>
+            <div
+              v-for="(s, i) in jkServers"
+              :key="i"
+              @click="selectJkServer(s)"
+              class="flex items-center justify-between p-3 rounded-lg bg-dark-800 hover:bg-dark-700 border border-dark-700 hover:border-primary-500/50 cursor-pointer transition-all"
+            >
+              <div>
+                <span class="text-white font-medium">{{ s.server }}</span>
+                <span v-if="s.size" class="text-dark-500 text-xs ml-2">({{ s.size }})</span>
+              </div>
+              <span class="text-xs px-2 py-0.5 rounded" :class="s.lang === 2 ? 'bg-green-500/10 text-green-400' : 'bg-blue-500/10 text-blue-400'">
+                {{ s.lang === 2 ? 'Latino' : 'Sub' }}
+              </span>
+            </div>
+          </div>
+
+          <div v-else-if="jkSearched && !jkLoading" class="text-center py-8 text-dark-400">
+            No se encontraron servidores. Verificá la URL.
+          </div>
         </div>
       </div>
 
@@ -115,6 +169,42 @@ const editingEpisode = ref(null)
 const saving = ref(false)
 const formError = ref('')
 const deleteConfirm = ref(null)
+
+const showJKImport = ref(false)
+const jkUrl = ref('')
+const jkServers = ref([])
+const jkLoading = ref(false)
+const jkSearched = ref(false)
+const jkError = ref('')
+
+async function fetchJKAnime() {
+  const url = jkUrl.value.trim()
+  if (!url) return
+  if (!url.includes('jkanime.net/')) {
+    jkError.value = 'La URL no es de JKAnime.net'
+    return
+  }
+  jkLoading.value = true
+  jkError.value = ''
+  jkSearched.value = false
+  jkServers.value = []
+  try {
+    const { getJKAnimeServers } = await import('@/lib/jkanime')
+    jkServers.value = await getJKAnimeServers(url)
+    jkSearched.value = true
+  } catch (err) {
+    jkError.value = err.message || 'Error al conectar con JKAnime'
+  }
+  jkLoading.value = false
+}
+
+async function selectJkServer(s) {
+  form.value.video_url = s.url
+  showJKImport.value = false
+  jkUrl.value = ''
+  jkServers.value = []
+  jkSearched.value = false
+}
 
 const form = ref({
   episode_number: 1,

@@ -4,12 +4,13 @@
       <div class="w-12 h-12 border-4 border-dark-600 border-t-primary-500 rounded-full animate-spin" />
     </div>
     <template v-else-if="episode">
-      <div v-if="isMegaUrl" class="relative bg-black">
+      <div v-if="isEmbedUrl" class="relative bg-black">
         <iframe
-          :src="megaEmbedUrl"
+          :src="embedSrc"
           class="w-full mx-auto"
           style="height: 85vh; max-height: 85vh;"
           frameborder="0"
+          allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
           allowfullscreen
         />
       </div>
@@ -129,6 +130,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAnimeStore } from '@/stores/anime'
 import { useUserStore } from '@/stores/user'
 import { useAuthStore } from '@/stores/auth'
+import { isEmbedUrl as isKnownEmbedUrl, getEmbedSrc } from '@/lib/jkanime'
 
 const route = useRoute()
 const router = useRouter()
@@ -151,17 +153,16 @@ const duration = ref(0)
 const videoError = ref(false)
 const playbackRate = ref(1)
 
-const isMegaUrl = computed(() => {
-  return episode.value?.video_url?.startsWith('https://mega.nz/file/')
+const isEmbedUrl = computed(() => {
+  const url = episode.value?.video_url
+  if (!url) return false
+  if (isKnownEmbedUrl(url)) return true
+  return !/\.(mp4|webm)$/i.test(url)
 })
 
-const megaEmbedUrl = computed(() => {
+const embedSrc = computed(() => {
   if (!episode.value?.video_url) return ''
-  const match = episode.value.video_url.match(/mega\.nz\/file\/([^#]+)#(.+)/)
-  if (match) {
-    return `https://mega.nz/embed/${match[1]}#${match[2]}`
-  }
-  return ''
+  return getEmbedSrc(episode.value.video_url)
 })
 let controlsTimer = null
 
