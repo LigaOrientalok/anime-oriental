@@ -4,7 +4,15 @@
       <div class="w-12 h-12 border-4 border-dark-600 border-t-primary-500 rounded-full animate-spin" />
     </div>
     <template v-else-if="episode">
-      <div class="relative bg-black" ref="playerContainer">
+      <div v-if="videoError" class="flex flex-col items-center justify-center py-32 text-center px-4">
+        <svg class="w-16 h-16 text-dark-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+        </svg>
+        <p class="text-white text-lg font-semibold mb-2">Error al cargar el video</p>
+        <p class="text-dark-400 max-w-md mb-6">La URL del video no es compatible con el reproductor. Necesitás un enlace directo a un archivo .mp4 o .webm.</p>
+        <p class="text-dark-500 text-sm">URL actual: <code class="text-dark-400 break-all">{{ episode.video_url }}</code></p>
+      </div>
+      <div v-else class="relative bg-black" ref="playerContainer">
         <video
           ref="video"
           class="w-full max-h-[85vh] mx-auto cursor-pointer"
@@ -12,6 +20,7 @@
           @timeupdate="onTimeUpdate"
           @loadedmetadata="onLoadedMetadata"
           @ended="onEnded"
+          @error="onVideoError"
           @click.prevent="togglePlay"
           @dblclick="toggleFullscreen"
           @keydown="handleKeydown"
@@ -128,6 +137,7 @@ const showOverlayPlay = ref(true)
 const showSpeedMenu = ref(false)
 const currentTime = ref(0)
 const duration = ref(0)
+const videoError = ref(false)
 const playbackRate = ref(1)
 let controlsTimer = null
 
@@ -164,6 +174,10 @@ onMounted(async () => {
 onUnmounted(() => {
   clearTimeout(controlsTimer)
 })
+
+function onVideoError() {
+  videoError.value = true
+}
 
 function onLoadedMetadata() {
   if (video.value) {
