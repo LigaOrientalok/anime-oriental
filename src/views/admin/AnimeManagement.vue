@@ -2,9 +2,15 @@
   <div class="animate-fade-in">
     <div class="flex items-center justify-between mb-8">
       <h1 class="text-3xl font-bold">Gestión de Animes</h1>
-      <button @click="showForm = true; editingAnime = null" class="btn-primary">
-        + Nuevo Anime
-      </button>
+      <div class="flex gap-2">
+        <button @click="showImport = true" class="btn-secondary flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+          Importar de MyAnimeList
+        </button>
+        <button @click="showForm = true; editingAnime = null" class="btn-primary">
+          + Nuevo Anime
+        </button>
+      </div>
     </div>
 
     <div v-if="loading" class="flex justify-center py-12">
@@ -64,6 +70,66 @@
               </tr>
             </tbody>
           </table>
+        </div>
+      </div>
+
+      <div v-if="showImport" class="fixed inset-0 bg-black/70 z-50 flex items-start justify-center pt-20 px-4 overflow-y-auto" @click.self="showImport = false">
+        <div class="card p-6 w-full max-w-4xl animate-scale-in mb-20">
+          <div class="flex items-center justify-between mb-6">
+            <h2 class="text-2xl font-bold">Importar desde MyAnimeList</h2>
+            <button @click="showImport = false" class="text-dark-400 hover:text-white transition-colors">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+
+          <div class="flex gap-3 mb-6">
+            <input
+              v-model="malQuery"
+              @keydown.enter="searchMal"
+              placeholder="Buscar anime en MyAnimeList..."
+              class="input-field flex-1"
+            />
+            <button @click="searchMal" :disabled="malSearching || !malQuery.trim()" class="btn-primary">
+              <svg v-if="malSearching" class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+              <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            </button>
+          </div>
+
+          <div v-if="malError" class="bg-red-500/10 text-red-400 px-4 py-3 rounded-lg text-sm mb-4">{{ malError }}</div>
+
+          <div v-if="malResults.length" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-3">
+            <div v-for="r in malResults" :key="r.mal_id" class="group relative bg-dark-800 rounded-xl overflow-hidden border border-dark-700 hover:border-primary-500/50 transition-all">
+              <div class="aspect-[3/4] overflow-hidden">
+                <img :src="r.images?.jpg?.image_url || ''" :alt="r.title" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" />
+              </div>
+              <div class="p-3">
+                <h3 class="text-sm font-medium text-white truncate">{{ r.title_english || r.title }}</h3>
+                <div class="flex items-center gap-2 mt-1 text-xs text-dark-400">
+                  <span>{{ r.year }}</span>
+                  <span class="text-yellow-500">★ {{ r.score || '?' }}</span>
+                </div>
+                <span class="text-xs px-1.5 py-0.5 rounded mt-1.5 inline-block"
+                  :class="r.status === 'Currently Airing' ? 'bg-green-500/10 text-green-400' : r.status === 'Finished Airing' ? 'bg-blue-500/10 text-blue-400' : 'bg-yellow-500/10 text-yellow-400'"
+                >
+                  {{ r.status }}
+                </span>
+              </div>
+              <button
+                @click="importAnime(r)"
+                :disabled="malImporting === r.mal_id"
+                class="absolute inset-0 w-full h-full bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center"
+              >
+                <span v-if="malImporting === r.mal_id" class="w-6 h-6 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                <span v-else class="bg-primary-600 hover:bg-primary-700 text-white text-sm font-semibold px-4 py-2 rounded-lg transition-colors">
+                  Importar
+                </span>
+              </button>
+            </div>
+          </div>
+
+          <div v-else-if="malSearched && !malSearching" class="text-center py-12 text-dark-400">
+            No se encontraron resultados. Probá con otro nombre.
+          </div>
         </div>
       </div>
 
@@ -149,6 +215,7 @@
 import { ref, onMounted } from 'vue'
 import { useAnimeStore } from '@/stores/anime'
 import { useAuthStore } from '@/stores/auth'
+import { searchAnime, getAnimeFull, getAnimeEpisodes, mapAnimeData, mapEpisodeData } from '@/lib/jikan'
 
 const animeStore = useAnimeStore()
 const auth = useAuthStore()
@@ -160,6 +227,56 @@ const editingAnime = ref(null)
 const saving = ref(false)
 const formError = ref('')
 const deleteConfirm = ref(null)
+
+const showImport = ref(false)
+const malQuery = ref('')
+const malResults = ref([])
+const malSearching = ref(false)
+const malSearched = ref(false)
+const malError = ref('')
+const malImporting = ref(null)
+
+async function searchMal() {
+  const q = malQuery.value.trim()
+  if (!q) return
+  malSearching.value = true
+  malError.value = ''
+  malSearched.value = false
+  try {
+    malResults.value = await searchAnime(q)
+    malSearched.value = true
+  } catch (err) {
+    malError.value = err.message || 'Error al buscar'
+  }
+  malSearching.value = false
+}
+
+async function importAnime(r) {
+  malImporting.value = r.mal_id
+  malError.value = ''
+  try {
+    const full = await getAnimeFull(r.mal_id)
+    if (!full) throw new Error('No se pudo obtener la información del anime')
+
+    const malEpisodes = await getAnimeEpisodes(r.mal_id)
+    const animeData = mapAnimeData(full)
+    const episodesData = mapEpisodeData(malEpisodes)
+
+    await animeStore.importFromMal(animeData, episodesData)
+
+    await animeStore.fetchAnimes({ sort: 'newest' })
+    animes.value = animeStore.animes
+
+    malImporting.value = null
+    malQuery.value = ''
+    malResults.value = []
+    malSearched.value = false
+    showImport.value = false
+  } catch (err) {
+    malError.value = err.message || 'Error al importar'
+    malImporting.value = null
+  }
+}
 
 const form = ref({
   title: '',

@@ -216,12 +216,30 @@ export const useAnimeStore = defineStore('anime', () => {
     return publicUrl
   }
 
+  async function importFromMal(animeData, episodesData) {
+    const { data: anime, error: err } = await supabase
+      .from('animes')
+      .insert([animeData])
+      .select()
+      .single()
+    if (err) throw err
+
+    if (episodesData.length) {
+      const { error: epErr } = await supabase
+        .from('episodes')
+        .insert(episodesData.map(ep => ({ ...ep, anime_id: anime.id })))
+      if (epErr) throw epErr
+    }
+
+    return anime
+  }
+
   return {
     animes, currentAnime, episodes, loading, error, totalCount,
     fetchAnimes, fetchAnimeById, fetchEpisodes, fetchEpisodeById,
     getPopularAnimes, getLatestEpisodes,
     createAnime, updateAnime, deleteAnime,
     createEpisode, updateEpisode, deleteEpisode,
-    getGenres, getYears, getStats, uploadFile
+    getGenres, getYears, getStats, uploadFile, importFromMal
   }
 })
