@@ -20,6 +20,9 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Could not extract anime info from page' })
     }
 
+    const slugMatch = url.match(/jkanime\.net\/([^/]+)/)
+    const slug = slugMatch ? slugMatch[1] : null
+
     const epTotalMatch = html.match(/Episodios:<\/span>\s*(\d+)/i)
     const totalEpisodes = epTotalMatch ? parseInt(epTotalMatch[1]) : null
 
@@ -62,7 +65,7 @@ export default async function handler(req, res) {
           number: parseInt(ep.number),
           title: ep.title,
           date: ep.timestamp,
-          url: `https://jkanime.net/${ep.slug}/${ep.number}/`,
+          url: `https://jkanime.net/${slug}/${ep.number}/`,
         })
       }
       if (epData.data.length < perPage) break
