@@ -139,13 +139,36 @@
                 <strong class="text-white">{{ episodes.length }}</strong> coinciden con la base de datos.
               </p>
               <button
-                v-if="!bulkImporting"
-                @click="runBulkImport"
+                v-if="!bulkImporting && !bulkScanning && !bulkSelectedServer"
+                @click="scanAvailableServers"
                 class="btn-primary"
                 :disabled="bulkImportDone"
               >
-                {{ bulkImportDone ? 'Importado' : 'Importar todos' }}
+                Importar todos
               </button>
+            </div>
+
+            <div v-if="bulkScanning" class="bg-dark-800 rounded-lg p-3">
+              <div class="flex items-center gap-3 text-sm">
+                <svg class="w-4 h-4 animate-spin text-primary-500" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                <span>Escaneando servidores disponibles...</span>
+              </div>
+            </div>
+
+            <div v-if="bulkAvailableServers.length && !bulkImporting" class="bg-dark-800 rounded-lg p-4 space-y-2">
+              <p class="text-sm text-dark-400">Elegí qué servidor usar para todos los episodios:</p>
+              <div class="flex flex-wrap gap-2">
+                <button
+                  v-for="srv in bulkAvailableServers"
+                  :key="srv.name"
+                  @click="runBulkImport(srv.name)"
+                  class="px-4 py-2 rounded-lg text-sm font-medium transition-all border"
+                  :class="bulkSelectedServer === srv.name ? 'bg-primary-500 text-white border-primary-500' : 'bg-dark-700 text-dark-200 border-dark-600 hover:border-primary-500/50'"
+                >
+                  {{ srv.name }}
+                  <span class="text-dark-400 text-xs ml-1">({{ srv.count }})</span>
+                </button>
+              </div>
             </div>
 
             <div v-if="bulkProgress" class="bg-dark-800 rounded-lg p-3">
@@ -293,6 +316,9 @@ const bulkError = ref('')
 const bulkImporting = ref(false)
 const bulkImportDone = ref(false)
 const bulkProgress = ref('')
+const bulkScanning = ref(false)
+const bulkAvailableServers = ref([])
+const bulkSelectedServer = ref('')
 
 function closeBulk() {
   showBulkJKImport.value = false
@@ -303,6 +329,9 @@ function closeBulk() {
   bulkImporting.value = false
   bulkImportDone.value = false
   bulkProgress.value = ''
+  bulkScanning.value = false
+  bulkAvailableServers.value = []
+  bulkSelectedServer.value = ''
 }
 
 async function fetchBulkJKList() {
@@ -331,10 +360,40 @@ async function fetchBulkJKList() {
   bulkLoading.value = false
 }
 
-async function runBulkImport() {
+async function scanAvailableServers() {
+  const pending = bulkEpisodeList.value.filter(ep => ep.status === 'pending')
+  if (!pending.length) return
+  bulkScanning.value = true
+  bulkAvailableServers.value = []
+  bulkSelectedServer.value = ''
+  const { getJKAnimeServers } = await import('@/lib/jkanime')
+  const serverCounts = {}
+  const scanCount = Math.min(pending.length, 5)
+  for (let i = 0; i < scanCount; i++) {
+    bulkProgress.value = `Escaneando episodio ${pending[i].number}...`
+    try {
+      const servers = await getJKAnimeServers(pending[i].url)
+      for (const s of servers) {
+        const name = s.server
+        if (!serverCounts[name]) serverCounts[name] = { name, count: 0, lang: s.lang }
+        serverCounts[name].count++
+      }
+    } catch (_) {}
+  }
+  bulkScanning.value = false
+  bulkProgress.value = ''
+  const sorted = Object.values(serverCounts).sort((a, b) => b.count - a.count)
+  bulkAvailableServers.value = sorted
+  if (sorted.length === 1) {
+    runBulkImport(sorted[0].name)
+  }
+}
+
+async function runBulkImport(serverName) {
   const animeId = route.params.animeId
   const pending = bulkEpisodeList.value.filter(ep => ep.status === 'pending')
   if (!pending.length) return
+  bulkSelectedServer.value = serverName
   bulkImporting.value = true
   bulkImportDone.value = false
   const { getJKAnimeServers } = await import('@/lib/jkanime')
@@ -344,10 +403,12 @@ async function runBulkImport() {
     try {
       const servers = await getJKAnimeServers(ep.url)
       if (servers.length) {
-        const best = servers.find(s => s.lang === 1) || servers[0]
+        const preferred = servers.find(s => s.server === serverName)
+        const fallback = servers.find(s => s.lang === 1) || servers[0]
+        const chosen = preferred || fallback
         const dbEp = episodes.value.find(e => e.episode_number === ep.number)
         if (dbEp) {
-          await animeStore.updateEpisode(dbEp.id, { video_url: best.url })
+          await animeStore.updateEpisode(dbEp.id, { video_url: chosen.url })
           ep.status = 'done'
         }
       } else {
