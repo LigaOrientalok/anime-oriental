@@ -4,88 +4,99 @@
       <div class="w-12 h-12 border-4 border-dark-600 border-t-primary-500 rounded-full animate-spin" />
     </div>
     <template v-else-if="episode">
-      <div v-if="videoError" class="flex flex-col items-center justify-center py-32 text-center px-4">
-        <svg class="w-16 h-16 text-dark-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
-        </svg>
-        <p class="text-white text-lg font-semibold mb-2">Error al cargar el video</p>
-        <p class="text-dark-400 max-w-md mb-6">La URL del video no es compatible con el reproductor. Necesitás un enlace directo a un archivo .mp4 o .webm.</p>
-        <p class="text-dark-500 text-sm">URL actual: <code class="text-dark-400 break-all">{{ episode.video_url }}</code></p>
-      </div>
-      <div v-else class="relative bg-black" ref="playerContainer">
-        <video
-          ref="video"
-          class="w-full max-h-[85vh] mx-auto cursor-pointer"
-          :src="episode.video_url"
-          @timeupdate="onTimeUpdate"
-          @loadedmetadata="onLoadedMetadata"
-          @ended="onEnded"
-          @error="onVideoError"
-          @click.prevent="togglePlay"
-          @dblclick="toggleFullscreen"
-          @keydown="handleKeydown"
-          tabindex="0"
-          playsinline
+      <div v-if="isMegaUrl" class="relative bg-black">
+        <iframe
+          :src="megaEmbedUrl"
+          class="w-full mx-auto"
+          style="height: 85vh; max-height: 85vh;"
+          frameborder="0"
+          allowfullscreen
         />
-
-        <div
-          v-if="showControls"
-          class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-4 pt-16 transition-opacity duration-300"
-          @mouseenter="showControls = true"
-        >
-          <div class="max-w-6xl mx-auto">
-            <div class="mb-2">
-              <input
-                type="range"
-                min="0"
-                :max="duration"
-                :value="currentTime"
-                @input="seek"
-                class="w-full h-1 appearance-none bg-dark-600 rounded-full cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:bg-primary-500 [&::-webkit-slider-thumb]:rounded-full"
-              />
-            </div>
-            <div class="flex items-center justify-between">
-              <div class="flex items-center gap-3">
-                <button @click="togglePlay" class="text-white hover:text-primary-500 transition-colors">
-                  <svg v-if="!isPlaying" class="w-8 h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                  <svg v-else class="w-8 h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/></svg>
-                </button>
-                <span class="text-sm text-gray-400">
-                  {{ formatTime(currentTime) }} / {{ formatTime(duration) }}
-                </span>
-              </div>
-              <div class="flex items-center gap-3">
-                <div class="relative">
-                  <button @click="showSpeedMenu = !showSpeedMenu" class="text-white hover:text-primary-500 text-sm font-medium transition-colors">
-                    {{ playbackRate }}x
-                  </button>
-                  <div v-if="showSpeedMenu" class="absolute bottom-full right-0 mb-2 bg-dark-800 border border-dark-700 rounded-xl overflow-hidden shadow-xl">
-                    <button v-for="rate in [0.5, 0.75, 1, 1.25, 1.5, 2]" :key="rate"
-                      @click="setSpeed(rate)"
-                      class="block w-full px-6 py-2 text-sm text-left hover:bg-dark-700 transition-colors"
-                      :class="playbackRate === rate ? 'text-primary-500' : 'text-gray-300'"
-                    >
-                      {{ rate }}x
-                    </button>
-                  </div>
-                </div>
-                <button @click="toggleFullscreen" class="text-white hover:text-primary-500 transition-colors">
-                  <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path v-if="!isFullscreen" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
-                    <path v-else stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5l5.25 5.25" />
-                  </svg>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        <div v-if="showOverlayPlay" class="absolute inset-0 flex items-center justify-center bg-black/40 cursor-pointer" @click="togglePlay">
-          <div class="w-20 h-20 rounded-full bg-primary-600/90 flex items-center justify-center">
-            <svg class="w-10 h-10 text-white ml-2" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-          </div>
-        </div>
       </div>
+      <template v-else>
+        <div v-if="videoError" class="flex flex-col items-center justify-center py-32 text-center px-4">
+          <svg class="w-16 h-16 text-dark-500 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+          </svg>
+          <p class="text-white text-lg font-semibold mb-2">Error al cargar el video</p>
+          <p class="text-dark-400 max-w-md mb-6">La URL del video no es compatible con el reproductor. Necesitás un enlace directo a un archivo .mp4 o .webm.</p>
+          <p class="text-dark-500 text-sm">URL actual: <code class="text-dark-400 break-all">{{ episode.video_url }}</code></p>
+        </div>
+        <div v-else class="relative bg-black" ref="playerContainer">
+          <video
+            ref="video"
+            class="w-full max-h-[85vh] mx-auto cursor-pointer"
+            :src="episode.video_url"
+            @timeupdate="onTimeUpdate"
+            @loadedmetadata="onLoadedMetadata"
+            @ended="onEnded"
+            @error="onVideoError"
+            @click.prevent="togglePlay"
+            @dblclick="toggleFullscreen"
+            @keydown="handleKeydown"
+            tabindex="0"
+            playsinline
+          />
+
+          <div
+            v-if="showControls"
+            class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/90 via-black/50 to-transparent p-4 pt-16 transition-opacity duration-300"
+            @mouseenter="showControls = true"
+          >
+            <div class="max-w-6xl mx-auto">
+              <div class="mb-2">
+                <input
+                  type="range"
+                  min="0"
+                  :max="duration"
+                  :value="currentTime"
+                  @input="seek"
+                  class="w-full h-1 appearance-none bg-dark-600 rounded-full cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:bg-primary-500 [&::-webkit-slider-thumb]:rounded-full"
+                />
+              </div>
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-3">
+                  <button @click="togglePlay" class="text-white hover:text-primary-500 transition-colors">
+                    <svg v-if="!isPlaying" class="w-8 h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                    <svg v-else class="w-8 h-8" fill="currentColor" viewBox="0 0 24 24"><path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/></svg>
+                  </button>
+                  <span class="text-sm text-gray-400">
+                    {{ formatTime(currentTime) }} / {{ formatTime(duration) }}
+                  </span>
+                </div>
+                <div class="flex items-center gap-3">
+                  <div class="relative">
+                    <button @click="showSpeedMenu = !showSpeedMenu" class="text-white hover:text-primary-500 text-sm font-medium transition-colors">
+                      {{ playbackRate }}x
+                    </button>
+                    <div v-if="showSpeedMenu" class="absolute bottom-full right-0 mb-2 bg-dark-800 border border-dark-700 rounded-xl overflow-hidden shadow-xl">
+                      <button v-for="rate in [0.5, 0.75, 1, 1.25, 1.5, 2]" :key="rate"
+                        @click="setSpeed(rate)"
+                        class="block w-full px-6 py-2 text-sm text-left hover:bg-dark-700 transition-colors"
+                        :class="playbackRate === rate ? 'text-primary-500' : 'text-gray-300'"
+                      >
+                        {{ rate }}x
+                      </button>
+                    </div>
+                  </div>
+                  <button @click="toggleFullscreen" class="text-white hover:text-primary-500 transition-colors">
+                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path v-if="!isFullscreen" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+                      <path v-else stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5l5.25 5.25" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div v-if="showOverlayPlay" class="absolute inset-0 flex items-center justify-center bg-black/40 cursor-pointer" @click="togglePlay">
+            <div class="w-20 h-20 rounded-full bg-primary-600/90 flex items-center justify-center">
+              <svg class="w-10 h-10 text-white ml-2" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+            </div>
+          </div>
+        </div>
+      </template>
 
       <div class="max-w-6xl mx-auto px-4 py-6">
         <div class="flex items-start justify-between gap-4">
@@ -139,6 +150,19 @@ const currentTime = ref(0)
 const duration = ref(0)
 const videoError = ref(false)
 const playbackRate = ref(1)
+
+const isMegaUrl = computed(() => {
+  return episode.value?.video_url?.startsWith('https://mega.nz/file/')
+})
+
+const megaEmbedUrl = computed(() => {
+  if (!episode.value?.video_url) return ''
+  const match = episode.value.video_url.match(/mega\.nz\/file\/([^#]+)#(.+)/)
+  if (match) {
+    return `https://mega.nz/embed/${match[1]}#${match[2]}`
+  }
+  return ''
+})
 let controlsTimer = null
 
 const prevEpisode = computed(() => {
