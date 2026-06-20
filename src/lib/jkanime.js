@@ -47,3 +47,9 @@ export async function getJKAnimeServers(episodeUrl) {
   const data = await res.json()
   return data.servers || []
 }
+
+export async function getJKAnimeEpisodeList(animeUrl) {
+  const res = await fetch(`/api/jkanime-episodes?url=${encodeURIComponent(animeUrl)}`)
+  if (!res.ok) throw new Error('Error al obtener lista de episodios')
+  return res.json()
+}

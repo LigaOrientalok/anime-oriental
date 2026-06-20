@@ -10,6 +10,10 @@
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
           Importar de JKAnime
         </button>
+        <button @click="showBulkJKImport = true" class="btn-secondary flex items-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"/></svg>
+          Importar todos desde JKAnime
+        </button>
         <button @click="showForm = true; editingEpisode = null" class="btn-primary">+ Nuevo Episodio</button>
       </div>
     </div>
@@ -100,6 +104,80 @@
 
           <div v-else-if="jkSearched && !jkLoading" class="text-center py-8 text-dark-400">
             No se encontraron servidores. Verificá la URL.
+          </div>
+        </div>
+      </div>
+
+      <div v-if="showBulkJKImport" class="fixed inset-0 bg-black/70 z-50 flex items-start justify-center pt-20 px-4 overflow-y-auto" @click.self="showBulkJKImport = false">
+        <div class="card p-6 w-full max-w-2xl animate-scale-in mb-20">
+          <div class="flex items-center justify-between mb-6">
+            <h2 class="text-2xl font-bold">Importar todos desde JKAnime</h2>
+            <button @click="closeBulk" class="text-dark-400 hover:text-white transition-colors">
+              <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+          </div>
+
+          <div class="flex gap-3 mb-4">
+            <input
+              v-model="bulkJkUrl"
+              @keydown.enter="fetchBulkJKList"
+              placeholder="URL del anime en JKAnime (ej: https://jkanime.net/naruto/)"
+              class="input-field flex-1"
+            />
+            <button @click="fetchBulkJKList" :disabled="bulkLoading || !bulkJkUrl.trim()" class="btn-primary">
+              <svg v-if="bulkLoading" class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+              <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/></svg>
+            </button>
+          </div>
+
+          <div v-if="bulkError" class="bg-red-500/10 text-red-400 px-4 py-3 rounded-lg text-sm mb-4">{{ bulkError }}</div>
+
+          <div v-if="bulkEpisodeList.length" class="space-y-4">
+            <div class="flex items-center justify-between">
+              <p class="text-sm text-dark-400">
+                Se encontraron <strong class="text-white">{{ bulkEpisodeList.length }}</strong> episodios en JKAnime.
+                <strong class="text-white">{{ episodes.length }}</strong> coinciden con la base de datos.
+              </p>
+              <button
+                v-if="!bulkImporting"
+                @click="runBulkImport"
+                class="btn-primary"
+                :disabled="bulkImportDone"
+              >
+                {{ bulkImportDone ? 'Importado' : 'Importar todos' }}
+              </button>
+            </div>
+
+            <div v-if="bulkProgress" class="bg-dark-800 rounded-lg p-3">
+              <div class="flex items-center gap-3 text-sm">
+                <svg v-if="bulkImporting" class="w-4 h-4 animate-spin text-primary-500" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"/><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
+                <span>{{ bulkProgress }}</span>
+              </div>
+            </div>
+
+            <div class="max-h-80 overflow-y-auto space-y-1">
+              <div
+                v-for="ep in bulkEpisodeList"
+                :key="ep.number"
+                class="flex items-center justify-between px-3 py-2 rounded-lg text-sm"
+                :class="ep.status === 'done' ? 'bg-green-500/10' : ep.status === 'error' ? 'bg-red-500/10' : ep.status === 'skipped' ? 'bg-dark-800/50' : 'bg-dark-800/30'"
+              >
+                <div class="flex items-center gap-3">
+                  <span class="text-dark-500 w-8">#{{ ep.number }}</span>
+                  <span class="text-white truncate max-w-md">{{ ep.title }}</span>
+                </div>
+                <div class="flex items-center gap-2">
+                  <span v-if="ep.status === 'done'" class="text-green-400 text-xs">OK</span>
+                  <span v-else-if="ep.status === 'error'" class="text-red-400 text-xs" :title="ep.error">{{ ep.error }}</span>
+                  <span v-else-if="ep.status === 'skipped'" class="text-dark-500 text-xs">Sin episodio en BD</span>
+                  <span v-else class="text-dark-500 text-xs">Pendiente</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div v-else-if="bulkSearched && !bulkLoading && !bulkError" class="text-center py-8 text-dark-400">
+            No se encontraron episodios. Verificá la URL del anime.
           </div>
         </div>
       </div>
@@ -204,6 +282,87 @@ async function selectJkServer(s) {
   jkUrl.value = ''
   jkServers.value = []
   jkSearched.value = false
+}
+
+const showBulkJKImport = ref(false)
+const bulkJkUrl = ref('')
+const bulkEpisodeList = ref([])
+const bulkLoading = ref(false)
+const bulkSearched = ref(false)
+const bulkError = ref('')
+const bulkImporting = ref(false)
+const bulkImportDone = ref(false)
+const bulkProgress = ref('')
+
+function closeBulk() {
+  showBulkJKImport.value = false
+  bulkJkUrl.value = ''
+  bulkEpisodeList.value = []
+  bulkSearched.value = false
+  bulkError.value = ''
+  bulkImporting.value = false
+  bulkImportDone.value = false
+  bulkProgress.value = ''
+}
+
+async function fetchBulkJKList() {
+  const url = bulkJkUrl.value.trim()
+  if (!url) return
+  if (!url.includes('jkanime.net/')) {
+    bulkError.value = 'La URL no es de JKAnime.net'
+    return
+  }
+  bulkLoading.value = true
+  bulkError.value = ''
+  bulkSearched.value = false
+  bulkEpisodeList.value = []
+  try {
+    const { getJKAnimeEpisodeList } = await import('@/lib/jkanime')
+    const data = await getJKAnimeEpisodeList(url)
+    bulkEpisodeList.value = data.episodes.map(ep => ({
+      ...ep,
+      status: episodes.value.find(e => e.episode_number === ep.number) ? 'pending' : 'skipped',
+      error: '',
+    }))
+    bulkSearched.value = true
+  } catch (err) {
+    bulkError.value = err.message || 'Error al obtener episodios de JKAnime'
+  }
+  bulkLoading.value = false
+}
+
+async function runBulkImport() {
+  const animeId = route.params.animeId
+  const pending = bulkEpisodeList.value.filter(ep => ep.status === 'pending')
+  if (!pending.length) return
+  bulkImporting.value = true
+  bulkImportDone.value = false
+  const { getJKAnimeServers } = await import('@/lib/jkanime')
+  for (let i = 0; i < pending.length; i++) {
+    const ep = pending[i]
+    bulkProgress.value = `Episodio ${ep.number} (${i + 1}/${pending.length})...`
+    try {
+      const servers = await getJKAnimeServers(ep.url)
+      if (servers.length) {
+        const best = servers.find(s => s.lang === 1) || servers[0]
+        const dbEp = episodes.value.find(e => e.episode_number === ep.number)
+        if (dbEp) {
+          await animeStore.updateEpisode(dbEp.id, { video_url: best.url })
+          ep.status = 'done'
+        }
+      } else {
+        ep.status = 'error'
+        ep.error = 'Sin servidores'
+      }
+    } catch (err) {
+      ep.status = 'error'
+      ep.error = 'Error de conexión'
+    }
+  }
+  bulkImporting.value = false
+  bulkImportDone.value = true
+  bulkProgress.value = `Importación completada. ${bulkEpisodeList.value.filter(e => e.status === 'done').length} episodios actualizados.`
+  episodes.value = await animeStore.fetchEpisodes(animeId)
 }
 
 const form = ref({
