@@ -5,7 +5,9 @@ export default async function handler(req, res) {
   }
 
   try {
-    const animeRes = await fetch(url)
+    const ua = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+
+    const animeRes = await fetch(url, { headers: { 'User-Agent': ua } })
     const html = await animeRes.text()
 
     const csrfMatch = html.match(/name="csrf-token"\s+content="([^"]+)"/)
@@ -21,17 +23,38 @@ export default async function handler(req, res) {
     const epTotalMatch = html.match(/Episodios:<\/span>\s*(\d+)/i)
     const totalEpisodes = epTotalMatch ? parseInt(epTotalMatch[1]) : null
 
+    const cookies = []
+    const cookieHeaders = animeRes.headers.entries()
+    for (const [key, val] of cookieHeaders) {
+      if (key.toLowerCase() === 'set-cookie') {
+        cookies.push(val.split(';')[0])
+      }
+    }
+    const cookieStr = cookies.join('; ')
+
     const episodes = []
     const perPage = 16
     const maxPages = totalEpisodes ? Math.ceil(totalEpisodes / perPage) + 1 : 100
 
+    const headers = {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'User-Agent': ua,
+      'Referer': url,
+      'X-Requested-With': 'XMLHttpRequest',
+    }
+    if (cookieStr) headers.Cookie = cookieStr
+
     for (let page = 1; page <= maxPages; page++) {
       const epRes = await fetch(`https://jkanime.net/ajax/episodes/${animeId}/${page}`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        headers,
         body: `_token=${encodeURIComponent(token)}`,
       })
-      if (!epRes.ok) break
+      if (!epRes.ok) {
+        const text = await epRes.text()
+        if (text.includes('Page Expired')) break
+        continue
+      }
       const epData = await epRes.json()
       if (!epData.data || !epData.data.length) break
       for (const ep of epData.data) {
