@@ -18,31 +18,31 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: 'Could not extract anime info from page' })
     }
 
-    const totalEpMatch = html.match(/paginationEps\((\d+)\)/)
-    const totalEpisodes = totalEpMatch ? parseInt(totalEpMatch[1]) : null
+    const epTotalMatch = html.match(/Episodios:<\/span>\s*(\d+)/i)
+    const totalEpisodes = epTotalMatch ? parseInt(epTotalMatch[1]) : null
 
     const episodes = []
     const perPage = 16
-    const totalPages = totalEpisodes ? Math.ceil(totalEpisodes / perPage) : 1
+    const maxPages = totalEpisodes ? Math.ceil(totalEpisodes / perPage) + 1 : 100
 
-    for (let page = 1; page <= totalPages; page++) {
+    for (let page = 1; page <= maxPages; page++) {
       const epRes = await fetch(`https://jkanime.net/ajax/episodes/${animeId}/${page}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: `_token=${encodeURIComponent(token)}`,
       })
-      if (!epRes.ok) continue
+      if (!epRes.ok) break
       const epData = await epRes.json()
-      if (epData.data) {
-        for (const ep of epData.data) {
-          episodes.push({
-            number: ep.number,
-            title: ep.title,
-            date: ep.timestamp,
-            url: `https://jkanime.net/${ep.slug}/${ep.number}/`,
-          })
-        }
+      if (!epData.data || !epData.data.length) break
+      for (const ep of epData.data) {
+        episodes.push({
+          number: parseInt(ep.number),
+          title: ep.title,
+          date: ep.timestamp,
+          url: `https://jkanime.net/${ep.slug}/${ep.number}/`,
+        })
       }
+      if (epData.data.length < perPage) break
     }
 
     episodes.sort((a, b) => a.number - b.number)
