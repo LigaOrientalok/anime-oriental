@@ -108,18 +108,85 @@
               <span v-if="episode.animes"> • {{ episode.animes.title }}</span>
             </p>
           </div>
-          <div class="flex gap-2">
+          <div class="flex items-center gap-2">
+            <select
+              v-if="allEpisodes.length > 1"
+              @change="goToEpisode($event.target.value)"
+              class="bg-dark-800 border border-dark-700 text-white text-sm rounded-lg px-3 py-2 appearance-none cursor-pointer hover:border-dark-500 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            >
+              <option value="" disabled selected>Episodio {{ episode.episode_number }}</option>
+              <option v-for="ep in allEpisodes" :key="ep.id" :value="ep.id">
+                Episodio {{ ep.episode_number }}{{ ep.title ? ' — ' + ep.title : '' }}
+              </option>
+            </select>
             <button v-if="prevEpisode" @click="goToEpisode(prevEpisode.id)" class="btn-secondary text-sm flex items-center gap-1">
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"/></svg>
-              Anterior
             </button>
             <button v-if="nextEpisode" @click="goToEpisode(nextEpisode.id)" class="btn-primary text-sm flex items-center gap-1">
-              Siguiente
               <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+            </button>
+            <button @click="showReportModal = true" class="btn-ghost text-sm p-2 text-dark-400 hover:text-red-400" title="Reportar link caído">
+              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L4.082 16.5c-.77.833.192 2.5 1.732 2.5z"/></svg>
             </button>
           </div>
         </div>
+
+        <div class="mt-8">
+          <h2 class="text-lg font-bold text-white mb-4">Comentarios</h2>
+          <div v-if="auth.isAuthenticated" class="flex gap-3 mb-4">
+            <input
+              v-model="newComment"
+              @keyup.enter="submitComment"
+              placeholder="Escribí un comentario..."
+              class="input-field flex-1"
+              :disabled="commentLoading"
+            />
+            <button @click="submitComment" :disabled="!newComment.trim() || commentLoading" class="btn-primary">
+              {{ commentLoading ? '...' : 'Enviar' }}
+            </button>
+          </div>
+          <p v-else class="text-dark-400 text-sm mb-4">
+            <router-link to="/login" class="text-primary-500">Iniciá sesión</router-link> para comentar.
+          </p>
+          <div v-if="commentLoading" class="flex justify-center py-8">
+            <div class="w-6 h-6 border-2 border-dark-600 border-t-primary-500 rounded-full animate-spin" />
+          </div>
+          <div v-else-if="episodeComments.length" class="space-y-3 max-h-80 overflow-y-auto">
+            <div v-for="c in episodeComments" :key="c.id" class="flex gap-3 p-3 rounded-xl bg-dark-800/50 border border-dark-700">
+              <div class="w-8 h-8 rounded-full bg-primary-600 flex items-center justify-center text-xs font-bold text-white flex-shrink-0 overflow-hidden">
+                <img v-if="c.profiles?.avatar_url" :src="c.profiles.avatar_url" class="w-full h-full object-cover" />
+                <span v-else>{{ (c.profiles?.username || c.profiles?.id || '?')[0].toUpperCase() }}</span>
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2">
+                  <span class="text-sm font-medium text-white">{{ c.profiles?.username || 'Anónimo' }}</span>
+                  <span class="text-xs text-dark-500">{{ timeAgo(c.created_at) }}</span>
+                </div>
+                <p class="text-gray-300 text-sm mt-1">{{ c.content }}</p>
+              </div>
+              <button v-if="c.user_id === auth.user?.id" @click="removeComment(c.id)" class="text-dark-500 hover:text-red-400 flex-shrink-0">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+              </button>
+            </div>
+          </div>
+          <p v-else class="text-dark-500 text-sm">No hay comentarios aún. ¡Sé el primero!</p>
+        </div>
       </div>
+
+      <Teleport to="body">
+        <div v-if="showReportModal" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" @click.self="showReportModal = false">
+          <div class="bg-dark-800 border border-dark-700 rounded-2xl p-6 w-full max-w-md">
+            <h3 class="text-lg font-bold text-white mb-2">Reportar link caído</h3>
+            <p class="text-sm text-dark-400 mb-4">El link del episodio {{ episode.episode_number }} no funciona. Los administradores lo revisarán.</p>
+            <textarea v-model="reportMessage" placeholder="Opcional: describí el problema..." class="input-field w-full mb-4" rows="3"></textarea>
+            <div class="flex gap-3 justify-end">
+              <button @click="showReportModal = false" class="btn-ghost">Cancelar</button>
+              <button @click="submitReport" :disabled="reportLoading" class="btn-primary">{{ reportLoading ? 'Enviando...' : 'Reportar' }}</button>
+            </div>
+            <p v-if="reportSuccess" class="text-green-400 text-sm mt-2">¡Reporte enviado! Gracias.</p>
+          </div>
+        </div>
+      </Teleport>
     </template>
   </div>
 </template>
@@ -152,6 +219,13 @@ const currentTime = ref(0)
 const duration = ref(0)
 const videoError = ref(false)
 const playbackRate = ref(1)
+const episodeComments = ref([])
+const newComment = ref('')
+const commentLoading = ref(false)
+const showReportModal = ref(false)
+const reportMessage = ref('')
+const reportLoading = ref(false)
+const reportSuccess = ref(false)
 
 const isEmbedUrl = computed(() => {
   const url = episode.value?.video_url
@@ -187,6 +261,8 @@ onMounted(async () => {
 
     if (episode.value) {
       allEpisodes.value = await animeStore.fetchEpisodes(animeId || episode.value.anime_id)
+
+      episodeComments.value = await userStore.fetchComments(episodeId)
 
       if (auth.isAuthenticated) {
         const progress = await userStore.getProgress(auth.user.id, episodeId)
@@ -310,6 +386,49 @@ async function onEnded() {
   if (nextEpisode.value) {
     autoNextTimer = setTimeout(() => goToEpisode(nextEpisode.value.id), 3000)
   }
+}
+
+async function submitComment() {
+  if (!newComment.value.trim() || !episode.value) return
+  commentLoading.value = true
+  const ok = await userStore.addComment(auth.user.id, episode.value.id, newComment.value.trim())
+  if (ok) {
+    newComment.value = ''
+    episodeComments.value = await userStore.fetchComments(episode.value.id)
+  }
+  commentLoading.value = false
+}
+
+async function removeComment(commentId) {
+  const ok = await userStore.deleteComment(commentId)
+  if (ok && episode.value) {
+    episodeComments.value = await userStore.fetchComments(episode.value.id)
+  }
+}
+
+async function submitReport() {
+  if (!episode.value) return
+  reportLoading.value = true
+  const ok = await userStore.reportBrokenLink(auth.user.id, episode.value.id, reportMessage.value)
+  if (ok) {
+    reportSuccess.value = true
+    reportMessage.value = ''
+    setTimeout(() => { showReportModal.value = false; reportSuccess.value = false }, 2000)
+  }
+  reportLoading.value = false
+}
+
+function timeAgo(date) {
+  if (!date) return ''
+  const diff = Date.now() - new Date(date).getTime()
+  const mins = Math.floor(diff / 60000)
+  if (mins < 1) return 'ahora'
+  if (mins < 60) return `hace ${mins} min`
+  const hours = Math.floor(mins / 60)
+  if (hours < 24) return `hace ${hours}h`
+  const days = Math.floor(hours / 24)
+  if (days < 30) return `hace ${days}d`
+  return new Date(date).toLocaleDateString('es-ES')
 }
 
 function goToEpisode(episodeId) {

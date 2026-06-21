@@ -27,6 +27,37 @@
 
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div class="lg:col-span-2 space-y-8">
+          <section v-if="progressByAnime.length">
+            <h2 class="section-title">Progreso por Anime</h2>
+            <div class="space-y-3">
+              <div v-for="p in progressByAnime" :key="p.anime?.id" class="p-4 rounded-xl bg-dark-800/50 border border-dark-700">
+                <div class="flex gap-4">
+                  <router-link :to="`/anime/${p.anime?.id}`" class="w-16 h-20 rounded-lg overflow-hidden flex-shrink-0">
+                    <img :src="p.anime?.cover_url" class="w-full h-full object-cover" />
+                  </router-link>
+                  <div class="flex-1 min-w-0">
+                    <router-link :to="`/anime/${p.anime?.id}`" class="text-white font-medium hover:text-primary-500 transition-colors">{{ p.anime?.title }}</router-link>
+                    <p class="text-dark-400 text-sm mt-1">{{ p.totalProgress }} / {{ p.episodes.length }} episodios vistos</p>
+                    <div class="w-full h-1.5 bg-dark-700 rounded-full overflow-hidden mt-2">
+                      <div class="h-full bg-primary-500 rounded-full" :style="{ width: (p.episodes.length ? (p.totalProgress / p.episodes.length) * 100 : 0) + '%' }" />
+                    </div>
+                    <div class="flex gap-2 mt-2">
+                      <router-link
+                        v-for="ep in p.episodes.slice(0, 3)"
+                        :key="ep.id"
+                        :to="`/ver/${p.anime?.id}/${ep.episode_id}`"
+                        class="text-xs px-2 py-0.5 rounded bg-dark-700 text-dark-300 hover:text-white hover:bg-dark-600 transition-colors"
+                      >
+                        Ep. {{ ep.episodes?.episode_number }}
+                      </router-link>
+                      <span v-if="p.episodes.length > 3" class="text-xs text-dark-500 self-center">+{{ p.episodes.length - 3 }} más</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+
           <section v-if="favorites.length">
             <h2 class="section-title">Favoritos</h2>
             <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
@@ -116,6 +147,7 @@ const userStore = useUserStore()
 const favorites = ref([])
 const watchLater = ref([])
 const historyItems = ref([])
+const progressByAnime = ref([])
 const username = ref('')
 const updateMessage = ref('')
 const updateError = ref(false)
@@ -126,6 +158,7 @@ onMounted(async () => {
   favorites.value = await userStore.fetchFavorites(auth.user.id)
   watchLater.value = await userStore.fetchWatchLater(auth.user.id)
   historyItems.value = await userStore.fetchHistory(auth.user.id)
+  progressByAnime.value = await userStore.getProgressByAnime(auth.user.id)
 })
 
 function formatDate(date) {

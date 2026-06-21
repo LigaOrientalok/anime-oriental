@@ -10,6 +10,33 @@
     <SearchBar v-if="!featuredAnime" class="max-w-2xl mx-auto px-4 mt-12" />
 
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-12 pb-16">
+      <div v-if="continueWatching.length" class="mt-8">
+        <HorizontalCarousel title="Continuar Viendo">
+          <router-link
+            v-for="cw in continueWatching"
+            :key="cw.id"
+            :to="`/ver/${cw.episodes?.anime_id}/${cw.episode_id}`"
+            class="min-w-[240px] md:min-w-[280px] block"
+          >
+            <div class="rounded-xl overflow-hidden bg-dark-800 border border-dark-700 hover:border-dark-500 transition-all group">
+              <div class="relative aspect-video">
+                <img :src="cw.episodes?.animes?.cover_url" class="w-full h-full object-cover" />
+                <div class="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                  <svg class="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                </div>
+                <div class="absolute bottom-0 left-0 right-0 h-1 bg-dark-700">
+                  <div class="h-full bg-primary-500 transition-all" :style="{ width: episodeProgress(cw) + '%' }" />
+                </div>
+              </div>
+              <div class="p-3">
+                <p class="text-white text-sm font-medium truncate">{{ cw.episodes?.animes?.title }}</p>
+                <p class="text-dark-400 text-xs">Ep. {{ cw.episodes?.episode_number }}</p>
+              </div>
+            </div>
+          </router-link>
+        </HorizontalCarousel>
+      </div>
+
       <div v-if="latestEpisodes.length" class="mt-8">
         <HorizontalCarousel title="Últimos Episodios" seeAllLink="/catalogo">
           <EpisodeCard v-for="ep in latestEpisodes" :key="ep.id" :episode="ep" class="min-w-[240px] md:min-w-[280px]" />
@@ -68,6 +95,7 @@ const recentAnimes = ref([])
 const latestEpisodes = ref([])
 const genres = ref([])
 const isFav = ref(false)
+const continueWatching = ref([])
 
 onMounted(async () => {
   const popular = await animeStore.getPopularAnimes(20)
@@ -87,8 +115,14 @@ onMounted(async () => {
 
   if (auth.isAuthenticated && featuredAnime.value) {
     isFav.value = await userStore.isFavorite(auth.user.id, featuredAnime.value.id)
+    continueWatching.value = await userStore.getContinueWatching(auth.user.id)
   }
 })
+
+function episodeProgress(cw) {
+  if (!cw.episodes?.duration || !cw.progress_seconds) return 0
+  return Math.min(100, Math.round((cw.progress_seconds / cw.episodes.duration) * 100))
+}
 
 function playFeatured() {
   if (featuredAnime.value) {
